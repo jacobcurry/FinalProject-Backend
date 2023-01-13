@@ -1,25 +1,35 @@
-const User = require("../model/userModel");
+const postgres = require("../postgres.js");
 const bcrypt = require("bcryptjs");
 
 module.exports.register = async (req, res, next) => {
   try {
     const { username, email, password } = req.body;
-    const usernameCheck = await User.findOne({ username });
-    if (usernameCheck) {
-      return res.json({ msg: "Username is already in use", status: false });
+    const usernameData = await postgres.query(
+      "SELECT * FROM users WHERE username = $1",
+      [username]
+    );
+    if (usernameData.rows.length > 0) {
+      return res.status(409).json({
+        msg: "Username is already in use",
+        status: false,
+      });
     }
-    const emailCheck = await User.findOne({ email });
-    if (emailCheck) {
-      return res.json({ msg: "Email is already in use", status: false });
+    const emailData = await postgres.query(
+      "SELECT * FROM users WHERE email = $1",
+      [email]
+    );
+    if (emailData.rows.length > 0) {
+      return res.status(409).json({
+        msg: "Email is already in use",
+        status: false,
+      });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({
-      email,
-      username,
-      password: hashedPassword,
-    });
-    delete user.password;
-    return res.json({ user, status: true });
+    const user = await postgres.query(
+      "INSERT INTO users (username, email, password) VALUES ($1,$2,$3) RETURNING *",
+      [username, email, hashedPassword]
+    );
+    return res.json({ user: user.rows[0], status: true });
   } catch (err) {
     next(err);
   }
@@ -28,18 +38,22 @@ module.exports.register = async (req, res, next) => {
 module.exports.login = async (req, res, next) => {
   try {
     const { username, password } = req.body;
-    const user = await User.findOne({ username });
-    if (!user) {
+    const user = await postgres.query(
+      "SELECT * FROM users WHERE username = $1",
+      [username]
+    );
+
+    if (user.rows.length === 0) {
       return res.json({ msg: "Incorrect username or password", status: false });
     }
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await bcrypt.compare(
+      password,
+      user.rows[0].password
+    );
     if (!isPasswordValid) {
       return res.json({ msg: "Incorrect username or password", status: false });
     }
-
-    delete user.password;
-
-    return res.json({ user, status: true });
+    return res.json({ user: user.rows[0], status: true });
   } catch (err) {
     next(err);
   }
@@ -47,31 +61,32 @@ module.exports.login = async (req, res, next) => {
 
 module.exports.editUser = async (req, res, next) => {
   try {
-    const userId = req.params.id;
+    const userId = parseInt(req.params.id);
     const { username, email } = req.body;
-    const usernameCheck = await User.findOne({ username });
-    if (usernameCheck) {
-      if (usernameCheck.id !== userId) {
+    const usernameCheck = await postgres.query(
+      "SELECT * FROM users WHERE username = $1",
+      [username]
+    );
+    if (usernameCheck.rows.length > 0) {
+      if (usernameCheck.rows[0].user_id !== userId) {
         return res.json({ msg: "Username already exists", status: false });
       }
     }
 
-    const emailCheck = await User.findOne({ email });
-    if (emailCheck) {
-      if (emailCheck.id !== userId) {
+    const emailCheck = await postgres.query(
+      "SELECT * FROM users WHERE email = $1",
+      [email]
+    );
+    if (emailCheck.rows.length > 0) {
+      if (emailCheck.rows[0].user_id !== userId) {
         return res.json({ msg: "Email already exists", status: false });
       }
     }
-    const userData = await User.findByIdAndUpdate(
-      userId,
-      {
-        email,
-        username,
-      },
-      { new: true }
+    const updatedUser = await postgres.query(
+      "UPDATE users SET username = $1, email = $2 WHERE user_id = $3 RETURNING *",
+      [username, email, userId]
     );
-
-    return res.json({ userData, status: true });
+    return res.json({ user: updatedUser.rows[0], status: true });
   } catch (err) {
     next(err);
   }
@@ -79,19 +94,15 @@ module.exports.editUser = async (req, res, next) => {
 
 module.exports.setAvatar = async (req, res, next) => {
   try {
-    const userId = req.params.id;
+    const userId = parseInt(req.params.id);
     const avatarImage = req.body.image;
-    const userData = await User.findByIdAndUpdate(
-      userId,
-      {
-        isAvatarImageSet: true,
-        avatarImage,
-      },
-      { new: true }
+    const updatedUser = await postgres.query(
+      "UPDATE users SET avatarimage = $1, isavatarimageset = $2 WHERE user_id = $3 RETURNING *",
+      [avatarImage, true, userId]
     );
     return res.json({
-      isSet: userData.isAvatarImageSet,
-      image: userData.avatarImage,
+      isSet: updatedUser.rows[0].isavatarimageset,
+      image: updatedUser.rows[0].avatarimage,
     });
   } catch (err) {
     next(err);
@@ -100,13 +111,12 @@ module.exports.setAvatar = async (req, res, next) => {
 
 module.exports.getAllUsers = async (req, res, next) => {
   try {
-    const users = await User.find({ _id: { $ne: req.params.id } }).select([
-      "email",
-      "username",
-      "avatarImage",
-      "_id",
-    ]);
-    return res.json(users);
+    userId = parseInt(req.params.id);
+    const users = await postgres.query(
+      "SELECT * FROM users WHERE user_id != $1",
+      [userId]
+    );
+    return res.json(users.rows);
   } catch (err) {
     next(err);
   }

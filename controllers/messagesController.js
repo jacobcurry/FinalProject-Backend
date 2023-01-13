@@ -1,17 +1,16 @@
-const messageModel = require("../model/messageModel");
+const postgres = require("../postgres.js");
 
 module.exports.addMessage = async (req, res, next) => {
   try {
     const { from, to, message } = req.body;
-    const data = await messageModel.create({
-      message: { text: message },
-      users: [from, to],
-      sender: from,
-    });
-    if (data) {
+    const data = await postgres.query(
+      "INSERT INTO messages (message, users, sender) VALUES ($1,$2,$3) RETURNING *",
+      [message, [from, to], from]
+    );
+    if (data.rows.length > 0) {
       return res.json({ msg: "Message added successfully" });
     }
-    return res.json({ msg: "Failed to add message to databse" });
+    return res.json({ msg: "Failed to add message to database" });
   } catch (err) {
     next(err);
   }
@@ -20,17 +19,17 @@ module.exports.addMessage = async (req, res, next) => {
 module.exports.getAllMessages = async (req, res, next) => {
   try {
     const { from, to } = req.body;
-    const messages = await messageModel
-      .find({
-        users: {
-          $all: [from, to],
-        },
-      })
-      .sort({ updatedAt: 1 });
-    const projectMessages = messages.map((msg) => {
+    const allMessages = await postgres.query(
+      "SELECT * FROM messages WHERE users = $1 OR users = $2 ORDER BY message_id ASC",
+      [
+        [from, to],
+        [to, from],
+      ]
+    );
+    const projectMessages = allMessages.rows.map((msg) => {
       return {
-        fromSelf: msg.sender.toString() === from,
-        message: msg.message.text,
+        fromSelf: msg.sender === from,
+        message: msg.message,
       };
     });
     res.json(projectMessages);
