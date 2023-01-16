@@ -28,10 +28,7 @@ const server = app.listen(process.env.PORT, () => {
 
 const io = socket(server, {
   cors: {
-    origin: [
-      "http://localhost:3000",
-      "https://luminous-crisp-c26c0b.netlify.app",
-    ],
+    origin: ["http://localhost:3000", "https://space-chat1.netlify.app"],
     credentials: true,
   },
 });
