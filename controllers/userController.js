@@ -166,6 +166,10 @@ module.exports.setFriend = async (req, res, next) => {
       "UPDATE users SET yourmessagedusers = ARRAY_APPEND(yourmessagedusers, $1) WHERE user_id = $2 RETURNING *",
       [friend_id, userId]
     );
+    const updatedFriend = await postgres.query(
+      "UPDATE users SET yourmessagedusers = ARRAY_APPEND(yourmessagedusers, $1) WHERE user_id = $2 RETURNING *",
+      [userId, friend_id]
+    );
     return res.json(updatedUser.rows);
   } catch (err) {
     next(err);
