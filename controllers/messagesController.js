@@ -8,6 +8,30 @@ module.exports.addMessage = async (req, res, next) => {
       [message, [from, to], from]
     );
     if (data.rows.length > 0) {
+      const userFriends = await postgres.query(
+        "SELECT * from users WHERE user_id = $1",
+        [to]
+      );
+
+      let returnStatus = false;
+
+      if (userFriends.rows[0].yourmessagedusers) {
+        userFriends.rows[0].yourmessagedusers.map((id) => {
+          if (from === id) {
+            returnStatus = true;
+          }
+        });
+      }
+      if (returnStatus) {
+        return res.json({
+          status: false,
+          msg: "You already have messages with this person",
+        });
+      }
+      const updatedUser = await postgres.query(
+        "UPDATE users SET yourmessagedusers = ARRAY_APPEND(yourmessagedusers, $1) WHERE user_id = $2 RETURNING *",
+        [from, to]
+      );
       return res.json({ msg: "Message added successfully" });
     }
     return res.json({ msg: "Failed to add message to database" });

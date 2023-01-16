@@ -15,3 +15,5 @@ CREATE TABLE messages(
   users VARCHAR[],
   sender INTEGER REFERENCES users
 );
+
+ALTER TABLE users ADD COLUMN yourMessagedUsers INTEGER[];

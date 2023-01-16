@@ -111,12 +111,83 @@ module.exports.setAvatar = async (req, res, next) => {
 
 module.exports.getAllUsers = async (req, res, next) => {
   try {
-    userId = parseInt(req.params.id);
+    const userId = parseInt(req.params.id);
     const users = await postgres.query(
       "SELECT * FROM users WHERE user_id != $1",
       [userId]
     );
     return res.json(users.rows);
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports.getSearchedUsers = async (req, res, next) => {
+  try {
+    const searchQuery = req.params.searchQuery;
+    const userId = parseInt(req.params.id);
+    const users = await postgres.query(
+      `SELECT * FROM users WHERE user_id != $1 AND username LIKE '%${searchQuery}%'`,
+      [userId]
+    );
+    return res.json(users.rows);
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports.setFriend = async (req, res, next) => {
+  try {
+    const friend_id = req.body.friend_id;
+    const userId = parseInt(req.params.id);
+
+    const userFriends = await postgres.query(
+      "SELECT * from users WHERE user_id = $1",
+      [userId]
+    );
+
+    let returnStatus = false;
+
+    if (userFriends.rows[0].yourmessagedusers) {
+      userFriends.rows[0].yourmessagedusers.map((id) => {
+        if (friend_id === id) {
+          returnStatus = true;
+        }
+      });
+    }
+    if (returnStatus) {
+      return res.json({
+        status: false,
+        msg: "You already have messages with this person",
+      });
+    }
+
+    const updatedUser = await postgres.query(
+      "UPDATE users SET yourmessagedusers = ARRAY_APPEND(yourmessagedusers, $1) WHERE user_id = $2 RETURNING *",
+      [friend_id, userId]
+    );
+    return res.json(updatedUser.rows);
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports.getFriends = async (req, res, next) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const user = await postgres.query(
+      "SELECT * FROM users WHERE user_id = $1",
+      [userId]
+    );
+
+    if (!user.rows[0].yourmessagedusers) {
+      return res.json({ status: false });
+    }
+    const friends = await postgres.query(
+      "SELECT * FROM users WHERE user_id = ANY($1)",
+      [user.rows[0].yourmessagedusers]
+    );
+    return res.json({ friends: friends.rows, status: true });
   } catch (err) {
     next(err);
   }
