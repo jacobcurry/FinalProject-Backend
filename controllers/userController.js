@@ -127,7 +127,7 @@ module.exports.getSearchedUsers = async (req, res, next) => {
     const searchQuery = req.params.searchQuery;
     const userId = parseInt(req.params.id);
     const users = await postgres.query(
-      `SELECT * FROM users WHERE user_id != $1 AND username LIKE '%${searchQuery}%'`,
+      `SELECT * FROM users WHERE user_id != $1 AND username ILIKE '%${searchQuery}%'`,
       [userId]
     );
     return res.json(users.rows);
