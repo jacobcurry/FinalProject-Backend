@@ -196,3 +196,22 @@ module.exports.getFriends = async (req, res, next) => {
     next(err);
   }
 };
+
+module.exports.deleteFriend = async (req, res, next) => {
+  try {
+    const userId = parseInt(req.params.userid);
+    const friend_id = parseInt(req.params.friendid);
+
+    const updatedUser = await postgres.query(
+      "UPDATE users SET yourmessagedusers = array_remove(yourmessagedusers, $1) WHERE user_id = $2 RETURNING *",
+      [friend_id, userId]
+    );
+    const updatedFriend = await postgres.query(
+      "UPDATE users SET yourmessagedusers = array_remove(yourmessagedusers, $1) WHERE user_id = $2 RETURNING *",
+      [userId, friend_id]
+    );
+    return res.json({ user: updatedUser.rows, friend: updatedFriend.rows });
+  } catch (err) {
+    next(err);
+  }
+};
