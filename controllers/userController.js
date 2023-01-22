@@ -9,7 +9,8 @@ module.exports.register = async (req, res, next) => {
       [username]
     );
     if (usernameData.rows.length > 0) {
-      return res.status(409).json({
+      console.log("hi");
+      return res.json({
         msg: "Username is already in use",
         status: false,
       });
@@ -19,7 +20,7 @@ module.exports.register = async (req, res, next) => {
       [email]
     );
     if (emailData.rows.length > 0) {
-      return res.status(409).json({
+      return res.json({
         msg: "Email is already in use",
         status: false,
       });
